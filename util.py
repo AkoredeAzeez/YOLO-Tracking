@@ -106,8 +106,9 @@ def plot_from_track_results(
     # Plot Detect results
     if pred_boxes is not None:
         for d in reversed(pred_boxes):
-            class_id, class_name = get_detection_class(result, d)
+            if not d.id: continue
             original_id = int(d.id.item())
+            class_id, class_name = get_detection_class(result, d)
             id = consolidator.get_representative_id(class_name, original_id) if consolidator else original_id
             name = f"{class_name}#{id}"
             if id != original_id: name += f"({original_id})"

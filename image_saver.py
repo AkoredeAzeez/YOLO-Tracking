@@ -9,7 +9,6 @@ class ImageSaver(Scheduled):
     def _handle(self, result: Results, box: Boxes, box_path: str, object_path: str, full_id: str):
         _, class_name = get_detection_class(result, box)
         if not box.id:
-            self.logger.warning(f"Box of class {class_name} has no ID")
             return
         image_path = f"{box_path}.jpg"
         crop = crop_box_from_result(result, box)
