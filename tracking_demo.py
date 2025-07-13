@@ -28,7 +28,6 @@ if __name__ == "__main__":
         use_beta=args.use_beta
     )
     try:
-        input("Continue?")
         tracker.run()
     except KeyboardInterrupt:
         pass
