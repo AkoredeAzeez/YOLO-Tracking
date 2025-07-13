@@ -27,30 +27,10 @@ class YoloTracker:
         self.SHOULD_SAVE_VIDEO = save_video
         self.OUTPUT_PATH = get_unique_path(output_path)
         self.SHOULD_SAVE_IMAGES = save_images
-        self.SHOULD_CONSOLIDATE = not skip_consolidation
         self.ONLY_PERSON = only_person
 
         self._load_model(use_beta)
-
-        # Instantiate and start the consolidator thread before the scheduler
-        if skip_consolidation:
-            self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
-            self.consolidator.start()
-        else:
-            self.consolidator = None
-
-        self.scheduler = Scheduler(
-            save_path=self.OUTPUT_PATH,
-            skip_frames=skip_frames,
-            consolidator=self.consolidator,
-        )\
-            | (ImageSaver() if self.SHOULD_SAVE_IMAGES else None)\
-            | EmbeddingAggregator(self.classification_model, self.layer_indices, batch_size=50)
-
-        if self.SHOULD_SAVE_VIDEO:
-            self.video_writer = VideoWriter(self.OUTPUT_PATH + '/output.avi')
-        else:
-            self.video_writer = None
+        self._load_components(skip_consolidation, skip_frames)
 
         self.logger = get_logger(self.__class__.__name__, f"{self.scheduler.save_path}/logs")
         self.logger.info(f"Tracking {self.SOURCE} with {self.model.model_name}")
@@ -72,6 +52,27 @@ class YoloTracker:
             self.classification_model = YOLO(".yolo/models/yolov8n-cls.pt").to(self.device)
             self.model = YOLO(".yolo/models/yolov8n.pt").to(self.device)
             self.layer_indices = [2, 4, 6, 8]
+
+    def _load_components(self, skip_consolidation: bool, skip_frames: int):
+        # Instantiate and start the consolidator thread before the scheduler
+        if skip_consolidation:
+            self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
+            self.consolidator.start()
+        else:
+            self.consolidator = None
+
+        self.scheduler = Scheduler(
+            save_path=self.OUTPUT_PATH,
+            skip_frames=skip_frames,
+            consolidator=self.consolidator,
+        )\
+            | (ImageSaver() if self.SHOULD_SAVE_IMAGES else None)\
+            | EmbeddingAggregator(self.classification_model, self.layer_indices, batch_size=50)
+
+        if self.SHOULD_SAVE_VIDEO:
+            self.video_writer = VideoWriter(self.OUTPUT_PATH + '/output.avi')
+        else:
+            self.video_writer = None
 
     def run(self):
         results: list[Results] = self.model.track(
