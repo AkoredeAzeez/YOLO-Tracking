@@ -56,10 +56,10 @@ class YoloTracker:
     def _load_components(self, skip_consolidation: bool, skip_frames: int):
         # Instantiate and start the consolidator thread before the scheduler
         if skip_consolidation:
+            self.consolidator = None
+        else:
             self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
             self.consolidator.start()
-        else:
-            self.consolidator = None
 
         self.scheduler = Scheduler(
             save_path=self.OUTPUT_PATH,

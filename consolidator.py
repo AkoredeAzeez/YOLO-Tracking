@@ -96,7 +96,7 @@ class Consolidator(threading.Thread):
         if rearrange:
             self._rearrange_files()
         end_time = time.perf_counter()
-        if not visualize:
+        if not visualize and self.log_timing:
             self.logger.info(f"Took {end_time-start_time:.4f} seconds")
 
     def visualize_similarity(self, class_name, sim_matrix: torch.Tensor, object_ids: list[int]):
