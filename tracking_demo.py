@@ -4,7 +4,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='YOLO tracking demo with embedding aggregation')
-    parser.add_argument('--source', type=str, default="store.mp4", help='Source video file path')
+    parser.add_argument('--source', type=str, default="samples/store.mp4", help='Source video file path')
     parser.add_argument('--skip-frames', type=int, default=5, help='Number of frames to skip')
     parser.add_argument('--output-path', type=str, default="output/results", help='Output directory path')
     parser.add_argument('--preview', action='store_true', help='Show preview window')
