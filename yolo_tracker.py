@@ -9,6 +9,7 @@ from embedding_aggregator import EmbeddingAggregator
 from image_saver import ImageSaver
 from scheduler import Scheduler
 from util import get_logger, get_unique_path, plot_from_track_results
+from video_writer import VideoWriter
 
 
 class YoloTracker:
@@ -55,6 +56,9 @@ class YoloTracker:
             | (ImageSaver() if self.SHOULD_SAVE_IMAGES else None)\
             | EmbeddingAggregator(self.classification_model, self.layer_indices, batch_size=50)
 
+        if self.SHOULD_SAVE_VIDEO:
+            self.video_writer = VideoWriter(self.OUTPUT_PATH + '/output.avi')
+
         self.logger = get_logger(__name__, f"{self.scheduler.save_path}/logs")
         self.logger.info(f"Tracking {self.SOURCE} with {self.model.model_name}")
         self.logger.info(f"Embedding model: {self.classification_model.model_name}")
@@ -67,7 +71,7 @@ class YoloTracker:
         results: list[Results] = self.model.track(
             source=self.SOURCE, stream=True, verbose=False,
             persist=True, tracker="trackers/botsort_with_reid.yaml",
-            save=self.SHOULD_SAVE_VIDEO, project=self.OUTPUT_PATH,
+            project=self.OUTPUT_PATH,
             classes = [0] if self.ONLY_PERSON else None,
             conf=0.75 if self.ONLY_PERSON else None
         )
@@ -79,11 +83,14 @@ class YoloTracker:
             self.logger.debug(f"Detection took {end_detection_time-start_detection_time:.4f} seconds")
             start_detection_time = end_detection_time
 
-            if self.SHOULD_PREVIEW:
+            if self.SHOULD_PREVIEW or self.SHOULD_SAVE_VIDEO:
                 im0 = plot_from_track_results(result, self.consolidator)
-                cv2.imshow("YOLO Tracking", im0)
-                if cv2.waitKey(50) & 0xFF == 27:
-                    break
+                if self.SHOULD_PREVIEW:
+                    cv2.imshow("YOLO Tracking", im0)
+                    if cv2.waitKey(50) & 0xFF == 27:
+                        break
+                if self.SHOULD_SAVE_VIDEO:
+                    self.video_writer.write(im0)
 
     def cleanup(self):
         end_time = time.perf_counter()
@@ -92,3 +99,4 @@ class YoloTracker:
         if self._start_time is not None:
             self.logger.info(f"Took {end_time-self._start_time:.4f} seconds")
         self.consolidator.cleanup()
+        self.video_writer.cleanup()
