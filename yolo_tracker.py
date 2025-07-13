@@ -8,11 +8,19 @@ from consolidator import Consolidator
 from embedding_aggregator import EmbeddingAggregator
 from image_saver import ImageSaver
 from scheduler import Scheduler
-from util import get_logger, get_unique_path
+from util import get_logger, get_unique_path, plot_from_track_results
 
 
 class YoloTracker:
-    def __init__(self, source, skip_frames, output_path, preview, save_video, save_images, skip_consolidation, only_person, use_beta):
+    def __init__(
+        self, source,
+        skip_frames: int = 5,
+        output_path: str = "output/results",
+        preview: bool = False,
+        save_video: bool = False, save_images: bool = False,
+        skip_consolidation: bool = False,
+        only_person: bool = False, use_beta: bool = False
+    ):
         self.SOURCE = source
         self.SHOULD_PREVIEW = preview
         self.SHOULD_SAVE_VIDEO = save_video
@@ -72,7 +80,7 @@ class YoloTracker:
             start_detection_time = end_detection_time
 
             if self.SHOULD_PREVIEW:
-                im0 = result.plot()
+                im0 = plot_from_track_results(result, self.consolidator)
                 cv2.imshow("YOLO Tracking", im0)
                 if cv2.waitKey(50) & 0xFF == 27:
                     break
