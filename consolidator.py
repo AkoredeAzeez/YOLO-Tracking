@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import threading
 
 class Consolidator(threading.Thread):
-    def __init__(self, embeddings_root: str, similarity_threshold: float = 0.9, interval: float = 30.0):
+    def __init__(self, embeddings_root: str, similarity_threshold: float = 0.9, interval: float|None = 30.0):
         super().__init__(daemon=True)
         self.embeddings_root = embeddings_root
         self.similarity_threshold = similarity_threshold
@@ -33,22 +33,27 @@ class Consolidator(threading.Thread):
         return class_results[object_id]
     
     def run(self):
-        self.logger.info(f"Consolidator thread started, consolidating every {self.interval} seconds.")
+        if self.interval:
+            self.logger.info(f"Consolidator thread started, consolidating every {self.interval} seconds.")
+        else:
+            self.logger.info(f"Consolidator thread started, consolidating in realtime.")
         while not self._stop_event.is_set():
             try:
                 self.consolidate(rearrange=True, visualize=False)
             except Exception as e:
                 self.logger.error(f"Error during consolidation: {e}")
-            self._stop_event.wait(self.interval)
+            if self.interval: self._stop_event.wait(self.interval)
         self.logger.info("Consolidator thread stopped.")
 
     def stop(self):
         self._stop_event.set()
 
     def _rearrange_files(self):
+        skipped = True
         for class_name, results in self.consolidation_results.items():
             for object_id, representative_id in results.items():
                 if object_id == representative_id: continue
+                skipped = False
                 old_folder = os.path.join(self.embeddings_root, f"{class_name}#{object_id}")
                 new_folder = os.path.join(self.embeddings_root, f"{class_name}#{representative_id}")
                 old_file = os.path.join(old_folder, "representative.pt")
@@ -57,7 +62,7 @@ class Consolidator(threading.Thread):
                 shutil.copytree(old_folder, new_folder, dirs_exist_ok=True)
                 shutil.rmtree(old_folder)
                 self.logger.debug(f"Moved {old_folder} to {new_folder}")
-        self.logger.info("Rearranged files")
+        if not skipped: self.logger.info("Rearranged files")
 
     def _find_representative_files(self):
         """Recursively find all representative.pt files and group by class."""

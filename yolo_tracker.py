@@ -45,7 +45,7 @@ class YoloTracker:
 
 
         # Instantiate and start the consolidator thread before the scheduler
-        self.consolidator = Consolidator(self.OUTPUT_PATH)
+        self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
         self.consolidator.start()
 
         self.scheduler = Scheduler(
