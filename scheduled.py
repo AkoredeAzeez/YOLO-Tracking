@@ -17,6 +17,7 @@ class Scheduled:
         self.thread = threading.Thread(target=self.worker, daemon=True)
         self.thread.start()
         self.scheduler: "Scheduler | None" = None
+        self.log_timing = True
 
     def set_scheduler(self, scheduler: "Scheduler"):
         self.scheduler = scheduler
@@ -28,15 +29,18 @@ class Scheduled:
             if item is None:
                 break
             result, box, box_path, object_path, full_id = item
-            start_time = time.perf_counter()
+            
+            if self.log_timing:
+                start_time = time.perf_counter()
             try:
                 self._handle(result, box, box_path, object_path, full_id)
             except Exception as e:
                 self.logger.error(f"Error in {self.name}: {e}")
             finally:
                 self.queue.task_done()
-                end_time = time.perf_counter()
-                self.logger.debug(f"Took {end_time-start_time:.4f} seconds")
+                if self.log_timing:
+                    end_time = time.perf_counter()
+                    self.logger.debug(f"Took {end_time-start_time:.4f} seconds")
     
     def _handle(self, result: Results, box: Boxes, box_path: str, object_path: str, full_id: str):
         raise NotImplementedError("Subclasses must implement this method")
