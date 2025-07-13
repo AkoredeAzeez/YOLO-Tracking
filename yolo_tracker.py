@@ -33,8 +33,11 @@ class YoloTracker:
         self._load_model(use_beta)
 
         # Instantiate and start the consolidator thread before the scheduler
-        self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
-        self.consolidator.start()
+        if skip_consolidation:
+            self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
+            self.consolidator.start()
+        else:
+            self.consolidator = None
 
         self.scheduler = Scheduler(
             save_path=self.OUTPUT_PATH,
@@ -46,8 +49,10 @@ class YoloTracker:
 
         if self.SHOULD_SAVE_VIDEO:
             self.video_writer = VideoWriter(self.OUTPUT_PATH + '/output.avi')
+        else:
+            self.video_writer = None
 
-        self.logger = get_logger(__name__, f"{self.scheduler.save_path}/logs")
+        self.logger = get_logger(self.__class__.__name__, f"{self.scheduler.save_path}/logs")
         self.logger.info(f"Tracking {self.SOURCE} with {self.model.model_name}")
         self.logger.info(f"Embedding model: {self.classification_model.model_name}")
         self.logger.info(f"Skipping {skip_frames} frames")
@@ -90,7 +95,7 @@ class YoloTracker:
                     cv2.imshow("YOLO Tracking", im0)
                     if cv2.waitKey(50) & 0xFF == 27:
                         break
-                if self.SHOULD_SAVE_VIDEO:
+                if self.video_writer:
                     self.video_writer.write(im0)
 
     def cleanup(self):
@@ -99,5 +104,5 @@ class YoloTracker:
         cv2.destroyAllWindows()
         if self._start_time is not None:
             self.logger.info(f"Took {end_time-self._start_time:.4f} seconds")
-        self.consolidator.cleanup()
-        self.video_writer.cleanup()
+        if self.consolidator: self.consolidator.cleanup()
+        if self.video_writer: self.video_writer.cleanup()

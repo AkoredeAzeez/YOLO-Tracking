@@ -63,7 +63,7 @@ def get_unique_path(save_path: str):
 
 def plot_from_track_results(
     result: Results,
-    consolidator: "Consolidator",
+    consolidator: "Optional[Consolidator]",
     conf: bool = True,
     line_width: Optional[int] = None,
     font_size: Optional[int] = None,
@@ -108,9 +108,10 @@ def plot_from_track_results(
         for d in reversed(pred_boxes):
             class_id, class_name = get_detection_class(result, d)
             original_id = int(d.id.item())
-            id = consolidator.get_representative_id(class_name, original_id)
-            name = ("" if id is None else f"id:{original_id}={id} ") + class_name
-            label = f"{name} {float(d.conf):.2f}" if conf else name
+            id = consolidator.get_representative_id(class_name, original_id) if consolidator else original_id
+            name = f"{class_name}#{id}"
+            if id != original_id: name += f"({original_id})"
+            label = f"{name} {int(d.conf*100)}%" if conf else name
             box = d.xyxy.squeeze()
             annotator.box_label(
                 box, label,
