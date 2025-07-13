@@ -11,6 +11,7 @@ import threading
 class Consolidator(threading.Thread):
     def __init__(self, embeddings_root: str, similarity_threshold: float = 0.9, interval: float|None = 30.0):
         super().__init__(daemon=True)
+        self.log_timing = False
         self.embeddings_root = embeddings_root
         self.similarity_threshold = similarity_threshold
         self.consolidation_results = {}
