@@ -4,7 +4,7 @@ import threading
 import time
 from ultralytics.engine.results import Results
 
-from util import get_detection, get_logger
+from util import get_detection_class, get_logger
 from scheduled import Scheduled
 from consolidator import Consolidator
 
@@ -41,7 +41,7 @@ class Scheduler:
                     continue
                 
                 for box in result.boxes:
-                    _, class_name = get_detection(result, box)
+                    _, class_name = get_detection_class(result, box)
                     if not box.id:
                         self.logger.warning(f"Box of class {class_name} has no ID")
                         continue

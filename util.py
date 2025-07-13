@@ -41,13 +41,13 @@ def crop_box_from_result(result: Results, box: Boxes):
     crop = result.orig_img[y1:y2, x1:x2].copy()
     return crop
 
-def get_classification(results: list[Results]):
+def get_classification_class(results: list[Results]):
     result = results[0]
     class_id = result.probs.top1
     class_name = result.names[class_id]
     return class_id, class_name
 
-def get_detection(result: Results, box: Boxes):
+def get_detection_class(result: Results, box: Boxes):
     class_id = int(box.cls.item())
     class_name = result.names[class_id]
     return class_id, class_name
@@ -106,14 +106,15 @@ def plot_from_track_results(
     # Plot Detect results
     if pred_boxes is not None:
         for d in reversed(pred_boxes):
-            original_id, class_name = get_detection(result, d)
+            class_id, class_name = get_detection_class(result, d)
+            original_id = int(d.id.item())
             id = consolidator.get_representative_id(class_name, original_id)
             name = ("" if id is None else f"id:{original_id}={id} ") + class_name
             label = f"{name} {float(d.conf):.2f}" if conf else name
             box = d.xyxy.squeeze()
             annotator.box_label(
                 box, label,
-                color=colors(int(d.cls), True),
+                color=colors(class_id, True),
             )
 
     return annotator.result()

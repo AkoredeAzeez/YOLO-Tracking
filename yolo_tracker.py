@@ -25,12 +25,37 @@ class YoloTracker:
         self.SOURCE = source
         self.SHOULD_PREVIEW = preview
         self.SHOULD_SAVE_VIDEO = save_video
-        self.SKIP_FRAMES = skip_frames
         self.OUTPUT_PATH = get_unique_path(output_path)
         self.SHOULD_SAVE_IMAGES = save_images
         self.SHOULD_CONSOLIDATE = not skip_consolidation
         self.ONLY_PERSON = only_person
 
+        self._load_model(use_beta)
+
+        # Instantiate and start the consolidator thread before the scheduler
+        self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
+        self.consolidator.start()
+
+        self.scheduler = Scheduler(
+            save_path=self.OUTPUT_PATH,
+            skip_frames=skip_frames,
+            consolidator=self.consolidator,
+        )\
+            | (ImageSaver() if self.SHOULD_SAVE_IMAGES else None)\
+            | EmbeddingAggregator(self.classification_model, self.layer_indices, batch_size=50)
+
+        if self.SHOULD_SAVE_VIDEO:
+            self.video_writer = VideoWriter(self.OUTPUT_PATH + '/output.avi')
+
+        self.logger = get_logger(__name__, f"{self.scheduler.save_path}/logs")
+        self.logger.info(f"Tracking {self.SOURCE} with {self.model.model_name}")
+        self.logger.info(f"Embedding model: {self.classification_model.model_name}")
+        self.logger.info(f"Skipping {skip_frames} frames")
+        self.logger.info(f"\n{self.scheduler}")
+
+        self._start_time = None
+
+    def _load_model(self, use_beta: bool):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
 
@@ -43,37 +68,13 @@ class YoloTracker:
             self.model = YOLO(".yolo/models/yolov8n.pt").to(self.device)
             self.layer_indices = [2, 4, 6, 8]
 
-
-        # Instantiate and start the consolidator thread before the scheduler
-        self.consolidator = Consolidator(self.OUTPUT_PATH, interval=None)
-        self.consolidator.start()
-
-        self.scheduler = Scheduler(
-            save_path=self.OUTPUT_PATH,
-            skip_frames=self.SKIP_FRAMES,
-            consolidator=self.consolidator,
-        )\
-            | (ImageSaver() if self.SHOULD_SAVE_IMAGES else None)\
-            | EmbeddingAggregator(self.classification_model, self.layer_indices, batch_size=50)
-
-        if self.SHOULD_SAVE_VIDEO:
-            self.video_writer = VideoWriter(self.OUTPUT_PATH + '/output.avi')
-
-        self.logger = get_logger(__name__, f"{self.scheduler.save_path}/logs")
-        self.logger.info(f"Tracking {self.SOURCE} with {self.model.model_name}")
-        self.logger.info(f"Embedding model: {self.classification_model.model_name}")
-        self.logger.info(f"Skipping {self.SKIP_FRAMES} frames")
-        self.logger.info(f"\n{self.scheduler}")
-
-        self._start_time = None
-
     def run(self):
         results: list[Results] = self.model.track(
             source=self.SOURCE, stream=True, verbose=False,
             persist=True, tracker="trackers/botsort_with_reid.yaml",
             project=self.OUTPUT_PATH,
             classes = [0] if self.ONLY_PERSON else None,
-            conf=0.75 if self.ONLY_PERSON else None
+            conf=0.5 if self.ONLY_PERSON else 0.5
         )
         self._start_time = time.perf_counter()
         start_detection_time = time.perf_counter()

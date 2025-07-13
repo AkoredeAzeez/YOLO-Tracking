@@ -2,12 +2,12 @@ import cv2
 from ultralytics.engine.results import Boxes, Results
 
 from scheduler import Scheduled
-from util import crop_box_from_result, get_detection
+from util import crop_box_from_result, get_detection_class
 
 
 class ImageSaver(Scheduled):
     def _handle(self, result: Results, box: Boxes, box_path: str, object_path: str, full_id: str):
-        _, class_name = get_detection(result, box)
+        _, class_name = get_detection_class(result, box)
         if not box.id:
             self.logger.warning(f"Box of class {class_name} has no ID")
             return
