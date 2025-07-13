@@ -20,14 +20,15 @@ if __name__ == "__main__":
         source=args.source,
         skip_frames=args.skip_frames,
         output_path=args.output_path,
-        preview=args.preview,
+        preview=True,
         save_video=args.save_video,
         save_images=args.save_images,
         skip_consolidation=args.skip_consolidation,
-        only_person=args.only_person,
+        only_person=True,
         use_beta=args.use_beta
     )
     try:
+        input("Continue?")
         tracker.run()
     except KeyboardInterrupt:
         pass

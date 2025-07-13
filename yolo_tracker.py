@@ -9,6 +9,7 @@ from embedding_aggregator import EmbeddingAggregator
 from image_saver import ImageSaver
 from scheduler import Scheduler
 from triangle_geofence import TriangleGeofence
+from polygon_geofence import PolygonGeofence  # ✅ make sure you have this
 from util import get_logger, get_unique_path, plot_from_track_results
 from video_writer import VideoWriter
 
@@ -55,7 +56,6 @@ class YoloTracker:
             self.layer_indices = [2, 4, 6, 8]
 
     def _load_components(self, skip_consolidation: bool, skip_frames: int):
-        # Instantiate and start the consolidator thread before the scheduler
         if skip_consolidation:
             self.consolidator = None
         else:
@@ -66,8 +66,8 @@ class YoloTracker:
             save_path=self.OUTPUT_PATH,
             skip_frames=skip_frames,
             consolidator=self.consolidator,
-        )\
-            | (ImageSaver() if self.SHOULD_SAVE_IMAGES else None)\
+        ) \
+            | (ImageSaver() if self.SHOULD_SAVE_IMAGES else None) \
             | EmbeddingAggregator(self.classification_model, self.layer_indices, batch_size=50)
 
         if self.SHOULD_SAVE_VIDEO:
@@ -75,87 +75,72 @@ class YoloTracker:
         else:
             self.video_writer = None
 
-        # Initialize geofence (will be updated once we get first frame)
-        self.geofence = TriangleGeofence()
+        choice = input("Choose geofence type: A for Polygon or B for Triangle: ").strip().lower()
+        if choice == 'a':
+            self.geofence = PolygonGeofence()
+            self._geofence_type = "polygon"
+            print("✅ Using Polygon Geofence")
+        else:
+            self.geofence = TriangleGeofence()
+            self._geofence_type = "triangle"
+            print("✅ Using Triangle Geofence")
+
         self.geofence_initialized = False
 
     def trigger_geofence_event(self, detected_object):
-        """
-        Called when an object enters the geofence
-        Add your custom trigger logic here
-        """
         print(f"🚨 GEOFENCE TRIGGER: {detected_object['class']} entered geofence!")
         self.logger.info(f"Geofence trigger: {detected_object['class']} at {detected_object['center']}")
-        
-        # Add your custom logic here:
-        # - Send alert
-        # - Save image
-        # - Log to database
-        # - etc.
 
     def process_geofence_detections(self, frame, results):
-        """
-        Process detections for geofence monitoring
-        """
         if not self.geofence_initialized:
-            h, w = frame.shape[:2]
-            self.geofence = TriangleGeofence(w, h)
             self.geofence_initialized = True
-        
-        # Draw geofence on frame
+
         self.geofence.draw_geofence(frame)
-        
+
         objects_inside = 0
-        
-        # Process YOLO detections
+
         if results.boxes is not None:
             boxes = results.boxes.cpu().numpy()
             for box in boxes:
                 x1, y1, x2, y2 = box.xyxy[0]
                 conf = box.conf[0]
                 cls = int(box.cls[0])
-                
-                # Calculate center point
+
                 center_x = int((x1 + x2) / 2)
                 center_y = int((y1 + y2) / 2)
                 center = (center_x, center_y)
-                
-                # Get class name
+
                 class_name = self.model.names[cls]
-                
-                # Check if object is inside geofence
-                is_inside = self.geofence.point_in_triangle(center)
-                
-                # Create detection object
+
+                # ✅ Use the correct geofence method
+                if self._geofence_type == "polygon":
+                    is_inside = self.geofence.point_in_polygon(center)
+                else:
+                    is_inside = self.geofence.point_in_triangle(center)
+
                 detected_object = {
-                    'bbox': (int(x1), int(y1), int(x2-x1), int(y2-y1)),
+                    'bbox': (int(x1), int(y1), int(x2 - x1), int(y2 - y1)),
                     'center': center,
                     'confidence': float(conf),
                     'class': class_name,
                     'class_id': cls
                 }
-                
-                # Draw bounding box with color based on geofence status
+
                 color = (0, 255, 0) if is_inside else (0, 0, 255)
                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
-                
-                # Draw center point
                 cv2.circle(frame, center, 5, color, -1)
-                
-                # Draw label
                 label = f"{class_name}: {conf:.2f}"
-                cv2.putText(frame, label, (int(x1), int(y1) - 10), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-                
+                cv2.putText(frame, label, (int(x1), int(y1) - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
                 if is_inside:
                     objects_inside += 1
                     self.trigger_geofence_event(detected_object)
-        
-        # Display detection status
+
         status_text = f"Objects in geofence: {objects_inside}"
-        cv2.putText(frame, status_text, (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        
+        cv2.putText(frame, status_text, (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
         return objects_inside
 
     def run(self):
@@ -163,7 +148,7 @@ class YoloTracker:
             source=self.SOURCE, stream=True, verbose=False,
             persist=True, tracker="trackers/botsort_with_reid.yaml",
             project=self.OUTPUT_PATH,
-            classes = [0] if self.ONLY_PERSON else None,
+            classes=[0] if self.ONLY_PERSON else None,
             conf=0.5 if self.ONLY_PERSON else 0.5
         )
         self._start_time = time.perf_counter()
@@ -171,7 +156,7 @@ class YoloTracker:
         for result in results:
             self.scheduler(result)
             end_detection_time = time.perf_counter()
-            self.logger.debug(f"Detection took {end_detection_time-start_detection_time:.4f} seconds")
+            self.logger.debug(f"Detection took {end_detection_time - start_detection_time:.4f} seconds")
             start_detection_time = end_detection_time
 
             if self.SHOULD_PREVIEW or self.SHOULD_SAVE_VIDEO:
@@ -189,6 +174,6 @@ class YoloTracker:
         self.scheduler.cleanup()
         cv2.destroyAllWindows()
         if self._start_time is not None:
-            self.logger.info(f"Took {end_time-self._start_time:.4f} seconds")
+            self.logger.info(f"Took {end_time - self._start_time:.4f} seconds")
         if self.consolidator: self.consolidator.cleanup()
         if self.video_writer: self.video_writer.cleanup()
