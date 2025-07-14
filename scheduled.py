@@ -5,6 +5,7 @@ import time
 from ultralytics.engine.results import Boxes, Results
 
 from util import get_logger
+import traceback
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -36,6 +37,7 @@ class Scheduled:
                 self._handle(result, box, box_path, object_path, full_id)
             except Exception as e:
                 self.logger.error(f"Error in {self.name}: {e}")
+                self.logger.debug(traceback.format_exc())
             finally:
                 self.queue.task_done()
                 if self.log_timing:

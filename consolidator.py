@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import threading
+import traceback
 
 class Consolidator(threading.Thread):
     def __init__(self, embeddings_root: str, similarity_threshold: float = 0.9, interval: float|None = 30.0):
@@ -43,6 +44,7 @@ class Consolidator(threading.Thread):
                 self.consolidate(rearrange=True, visualize=False)
             except Exception as e:
                 self.logger.error(f"Error during consolidation: {e}")
+                self.logger.debug(traceback.format_exc())
             if self.interval: self._stop_event.wait(self.interval)
         self.logger.info("Consolidator thread stopped.")
 
@@ -59,6 +61,7 @@ class Consolidator(threading.Thread):
                 new_folder = os.path.join(self.embeddings_root, f"{class_name}#{representative_id}")
                 old_file = os.path.join(old_folder, "representative.pt")
                 new_file = os.path.join(new_folder, f"representative_{object_id}.pt")
+                os.makedirs(os.path.dirname(new_file), exist_ok=True)
                 shutil.copy(old_file, new_file)
                 shutil.copytree(old_folder, new_folder, dirs_exist_ok=True)
                 shutil.rmtree(old_folder)
